@@ -16,29 +16,6 @@
  */
 package org.apache.coyote;
 
-import java.net.InetAddress;
-import java.nio.ByteBuffer;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-
-import javax.management.InstanceNotFoundException;
-import javax.management.MBeanRegistration;
-import javax.management.MBeanRegistrationException;
-import javax.management.MBeanServer;
-import javax.management.MalformedObjectNameException;
-import javax.management.ObjectName;
-import javax.servlet.http.HttpUpgradeHandler;
-import javax.servlet.http.WebConnection;
-
 import org.apache.coyote.http11.upgrade.InternalHttpUpgradeHandler;
 import org.apache.coyote.http11.upgrade.UpgradeProcessorInternal;
 import org.apache.juli.logging.Log;
@@ -51,6 +28,18 @@ import org.apache.tomcat.util.net.AbstractEndpoint.Handler;
 import org.apache.tomcat.util.net.SocketEvent;
 import org.apache.tomcat.util.net.SocketWrapperBase;
 import org.apache.tomcat.util.res.StringManager;
+
+import javax.management.*;
+import javax.servlet.http.HttpUpgradeHandler;
+import javax.servlet.http.WebConnection;
+import java.net.InetAddress;
+import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class AbstractProtocol<S> implements ProtocolHandler,
         MBeanRegistration {
@@ -793,6 +782,7 @@ public abstract class AbstractProtocol<S> implements ProtocolHandler,
                 return SocketState.OPEN;
             }
 
+            //创建一个新的Http11Processor
             if (processor != null) {
                 // Make sure an async timeout doesn't fire
                 getProtocol().removeWaitingProcessor(processor);
@@ -864,7 +854,9 @@ public abstract class AbstractProtocol<S> implements ProtocolHandler,
                 wrapper.setCurrentProcessor(processor);
 
                 SocketState state = SocketState.CLOSED;
+                //只要状态为 SocketState.UPGRADING，一直循环
                 do {
+                    //处理核心
                     state = processor.process(wrapper, status);
 
                     if (state == SocketState.UPGRADING) {

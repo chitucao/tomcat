@@ -16,16 +16,16 @@
  */
 package org.apache.coyote;
 
-import java.io.IOException;
-import java.util.Iterator;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
-
 import org.apache.juli.logging.Log;
 import org.apache.tomcat.util.net.AbstractEndpoint.Handler.SocketState;
 import org.apache.tomcat.util.net.DispatchType;
 import org.apache.tomcat.util.net.SocketEvent;
 import org.apache.tomcat.util.net.SocketWrapperBase;
+
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  * This is a light-weight abstract processor implementation that is intended as
@@ -38,8 +38,7 @@ public abstract class AbstractProcessorLight implements Processor {
 
 
     @Override
-    public SocketState process(SocketWrapperBase<?> socketWrapper, SocketEvent status)
-            throws IOException {
+    public SocketState process(SocketWrapperBase<?> socketWrapper, SocketEvent status) throws IOException {
 
         SocketState state = SocketState.CLOSED;
         Iterator<DispatchType> dispatches = null;
@@ -49,6 +48,9 @@ public abstract class AbstractProcessorLight implements Processor {
                 if (getLog().isDebugEnabled()) {
                     getLog().debug("Processing dispatch type: [" + nextDispatch + "]");
                 }
+                //处理不在标准HTTP模式下的正在处理中的请求。
+                //目前使用的包括Servlet 3.0异步和HTTP升级连接
+                //将来可能会增加更多的用途。这些通常以HTTP请求开始。
                 state = dispatch(nextDispatch.getSocketStatus());
                 if (!dispatches.hasNext()) {
                     state = checkForPipelinedData(state, socketWrapper);

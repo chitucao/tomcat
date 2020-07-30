@@ -16,15 +16,6 @@
  */
 package org.apache.catalina.core;
 
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import javax.servlet.DispatcherType;
-import javax.servlet.RequestDispatcher;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.catalina.Context;
 import org.apache.catalina.Globals;
 import org.apache.catalina.Wrapper;
@@ -38,6 +29,14 @@ import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.descriptor.web.ErrorPage;
 import org.apache.tomcat.util.res.StringManager;
+
+import javax.servlet.DispatcherType;
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Valve that implements the default basic behavior for the
@@ -108,6 +107,7 @@ final class StandardHostValve extends ValveBase {
         throws IOException, ServletException {
 
         // Select the Context to be used for this Request
+        //选择要用于此请求的上下文
         Context context = request.getContext();
         if (context == null) {
             return;
@@ -120,6 +120,10 @@ final class StandardHostValve extends ValveBase {
         boolean asyncAtStart = request.isAsync();
 
         try {
+            //将当前线程上下文类加载器更改为web应用程序类加载器。
+            //如果没有定义web应用程序类加载器，或者当前线程已经在使用web应用程序类加载器，则不会进行任何更改。
+            //如果类加载器被更改，并且有一个{@link org.apache.catalina.ThreadBindingListener}被配置，则调用
+            //{@link org.apache.catalina.ThreadBindingListener#bind()}
             context.bind(Globals.IS_SECURITY_ENABLED, MY_CLASSLOADER);
 
             if (!asyncAtStart && !context.fireRequestInitEvent(request.getRequest())) {
@@ -134,6 +138,9 @@ final class StandardHostValve extends ValveBase {
             // already in error must have been routed here to check for
             // application defined error pages so DO NOT forward them to the the
             // application for processing.
+            // 请求上下文处理此请求。
+            // 已经出错的请求必须在这里路由，以检查应用程序定义的错误页面，
+            // 因此不要将它们转发给应用程序进行处理。
             try {
                 if (!response.isErrorReportRequired()) {
                     context.getPipeline().getFirst().invoke(request, response);
@@ -187,6 +194,7 @@ final class StandardHostValve extends ValveBase {
                 request.getSession(false);
             }
 
+            //将当前线程上下文类加载器还原为调用{@link #bind(boolean, ClassLoader)}之前使用的原始类加载器。
             context.unbind(Globals.IS_SECURITY_ENABLED, MY_CLASSLOADER);
         }
     }

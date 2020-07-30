@@ -17,20 +17,6 @@
 package org.apache.catalina.startup;
 
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.lang.reflect.Constructor;
-import java.net.ConnectException;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.logging.LogManager;
-
 import org.apache.catalina.Container;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleState;
@@ -51,6 +37,16 @@ import org.apache.tomcat.util.log.SystemLogHandler;
 import org.apache.tomcat.util.res.StringManager;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
+
+import java.io.*;
+import java.lang.reflect.Constructor;
+import java.net.ConnectException;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.LogManager;
 
 
 /**
@@ -276,13 +272,17 @@ public class Catalina {
     /**
      * Create and configure the Digester we will be using for startup.
      * @return the main digester to parse server.xml
+     * 创建和配置将用于启动的Digester。
      */
     protected Digester createStartDigester() {
         long t1=System.currentTimeMillis();
         // Initialize the digester
         Digester digester = new Digester();
+        //设置验证解析器标志。
         digester.setValidating(false);
+        //设置规则验证标志。
         digester.setRulesValidation(true);
+        //假的属性
         Map<Class<?>, List<String>> fakeAttributes = new HashMap<>();
         // Ignore className on all elements
         List<String> objectAttrs = new ArrayList<>();
@@ -296,39 +296,34 @@ public class Catalina {
         List<String> connectorAttrs = new ArrayList<>();
         connectorAttrs.add("portOffset");
         fakeAttributes.put(Connector.class, connectorAttrs);
+        //设置假属性。
         digester.setFakeAttributes(fakeAttributes);
+        //确定是否使用上下文类加载器来解析/加载在各种规则中定义的类。
         digester.setUseContextClassLoader(true);
 
+        // 配置我们将使用的操作
+        //addObjectCreate：为指定的参数添加“对象创建”规则。
         // Configure the actions we will be using
-        digester.addObjectCreate("Server",
-                                 "org.apache.catalina.core.StandardServer",
-                                 "className");
+        digester.addObjectCreate("Server", "org.apache.catalina.core.StandardServer", "className");
+        //为指定的参数添加“设置属性”规则。
         digester.addSetProperties("Server");
-        digester.addSetNext("Server",
-                            "setServer",
-                            "org.apache.catalina.Server");
+        //为指定的参数添加“set next”规则。
+        digester.addSetNext("Server", "setServer", "org.apache.catalina.Server");
 
-        digester.addObjectCreate("Server/GlobalNamingResources",
-                                 "org.apache.catalina.deploy.NamingResourcesImpl");
+        digester.addObjectCreate("Server/GlobalNamingResources", "org.apache.catalina.deploy.NamingResourcesImpl");
         digester.addSetProperties("Server/GlobalNamingResources");
         digester.addSetNext("Server/GlobalNamingResources",
                             "setGlobalNamingResources",
                             "org.apache.catalina.deploy.NamingResourcesImpl");
 
-        digester.addRule("Server/Listener",
-                new ListenerCreateRule(null, "className"));
+        digester.addRule("Server/Listener", new ListenerCreateRule(null, "className"));
         digester.addSetProperties("Server/Listener");
-        digester.addSetNext("Server/Listener",
-                            "addLifecycleListener",
-                            "org.apache.catalina.LifecycleListener");
+        digester.addSetNext("Server/Listener", "addLifecycleListener", "org.apache.catalina.LifecycleListener");
 
-        digester.addObjectCreate("Server/Service",
-                                 "org.apache.catalina.core.StandardService",
-                                 "className");
+
+        digester.addObjectCreate("Server/Service", "org.apache.catalina.core.StandardService", "className");
         digester.addSetProperties("Server/Service");
-        digester.addSetNext("Server/Service",
-                            "addService",
-                            "org.apache.catalina.Service");
+        digester.addSetNext("Server/Service", "addService", "org.apache.catalina.Service");
 
         digester.addObjectCreate("Server/Service/Listener",
                                  null, // MUST be specified in the element
@@ -405,6 +400,7 @@ public class Catalina {
                             "org.apache.coyote.UpgradeProtocol");
 
         // Add RuleSets for nested elements
+        //注册规则集中定义的一组规则实例。
         digester.addRuleSet(new NamingRuleSet("Server/GlobalNamingResources/"));
         digester.addRuleSet(new EngineRuleSet("Server/Service/"));
         digester.addRuleSet(new HostRuleSet("Server/Service/Engine/"));
@@ -536,9 +532,10 @@ public class Catalina {
 
     /**
      * Start a new server instance.
+     *  启动一个新的服务器实例。
      */
     public void load() {
-
+        //防止重复加载。
         if (loaded) {
             return;
         }
@@ -546,9 +543,11 @@ public class Catalina {
 
         long t1 = System.nanoTime();
 
+        //创建java.io.tmpdir文件夹
         initDirs();
 
         // Before digester - it may be needed
+        //初始化jmx的环境变量
         initNaming();
 
         // Set configuration source
@@ -556,13 +555,20 @@ public class Catalina {
         File file = configFile();
 
         // Create and execute our Digester
+        // 创建和配置将用于启动的Digester。
+        // 配置解析server.xml中各个标签的解析类
+        // Digeter是apache的common项目，作用是将XML转化成对象，使用者直接从对象中获取xml的节点信息。
+        // Digester是对SAX的包装，它也是基于文件流来解析xml文件，只不过这些解析操作对用户是透明的。
         Digester digester = createStartDigester();
 
+        //下面一大段都是为了加载conf/server.xml配置文件，失败就加载server-embed.xml
         try (ConfigurationSource.Resource resource = ConfigFileLoader.getSource().getServerXml()) {
             InputStream inputStream = resource.getInputStream();
             InputSource inputSource = new InputSource(resource.getURI().toURL().toString());
             inputSource.setByteStream(inputStream);
+            //把Catalina作为一个顶级容器
             digester.push(this);
+            //解析过程会实例化各个组件，比如Server、Container、Connector等
             digester.parse(inputSource);
         } catch (Exception e) {
             log.warn(sm.getString("catalina.configFail", file.getAbsolutePath()), e);
@@ -572,6 +578,7 @@ public class Catalina {
             return;
         }
 
+        //这里的server在解析xml之后就有值了，这是Server的Catalina信息
         getServer().setCatalina(this);
         getServer().setCatalinaHome(Bootstrap.getCatalinaHomeFile());
         getServer().setCatalinaBase(Bootstrap.getCatalinaBaseFile());
@@ -581,6 +588,7 @@ public class Catalina {
 
         // Start the new server
         try {
+            //生命周期init方法
             getServer().init();
         } catch (LifecycleException e) {
             if (Boolean.getBoolean("org.apache.catalina.startup.EXIT_ON_INIT_FAILURE")) {
@@ -614,13 +622,16 @@ public class Catalina {
 
     /**
      * Start a new server instance.
+     * 启动一个新的服务器实例。
      */
     public void start() {
 
+        //如果Server组件不存在，则重新执行load方法
         if (getServer() == null) {
             load();
         }
 
+        //依然不存在就返回
         if (getServer() == null) {
             log.fatal(sm.getString("catalina.noServer"));
             return;
@@ -630,10 +641,12 @@ public class Catalina {
 
         // Start the new server
         try {
+            //调用Server的start方法
             getServer().start();
         } catch (LifecycleException e) {
             log.fatal(sm.getString("catalina.serverStartFail"), e);
             try {
+                //异常的时候调用Server的destroy方法
                 getServer().destroy();
             } catch (LifecycleException e1) {
                 log.debug("destroy() failed for failed Server ", e1);
@@ -647,6 +660,7 @@ public class Catalina {
         }
 
         // Register shutdown hook
+        //注册关闭钩子
         if (useShutdownHook) {
             if (shutdownHook == null) {
                 shutdownHook = new CatalinaShutdownHook();
@@ -663,8 +677,11 @@ public class Catalina {
             }
         }
 
+        // Bootstrap中会设置await为true，其目的在于让tomcat在shutdown端口阻塞监听关闭命令
         if (await) {
+            //等待收到正确的关机命令，然后返回。
             await();
+            //停止现有的服务器实例。
             stop();
         }
     }
@@ -685,8 +702,7 @@ public class Catalina {
                 // log messages are not lost
                 LogManager logManager = LogManager.getLogManager();
                 if (logManager instanceof ClassLoaderLogManager) {
-                    ((ClassLoaderLogManager) logManager).setUseShutdownHook(
-                            true);
+                    ((ClassLoaderLogManager) logManager).setUseShutdownHook(true);
                 }
             }
         } catch (Throwable t) {

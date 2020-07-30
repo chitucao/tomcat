@@ -16,6 +16,9 @@
  */
 package org.apache.catalina.startup;
 
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -27,9 +30,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-
-import org.apache.juli.logging.Log;
-import org.apache.juli.logging.LogFactory;
 
 /**
  * <p>Utility class for building class loaders for Catalina.  The factory
@@ -152,22 +152,24 @@ public final class ClassLoaderFactory {
      *
      * @exception Exception if an error occurs constructing the class loader
      */
-    public static ClassLoader createClassLoader(List<Repository> repositories,
-                                                final ClassLoader parent)
-        throws Exception {
+    public static ClassLoader createClassLoader(List<Repository> repositories, final ClassLoader parent) throws Exception {
 
-        if (log.isDebugEnabled())
+        if (log.isDebugEnabled()) {
             log.debug("Creating new class loader");
+        }
 
         // Construct the "class path" for this class loader
         Set<URL> set = new LinkedHashSet<>();
 
         if (repositories != null) {
             for (Repository repository : repositories)  {
+                // 对不同类型的 Repository 对象进行处理，将路径转换为URL类型
+                // 因为 URL 类型带有明显的协议，比如jar:xxx、file:xxx
                 if (repository.getType() == RepositoryType.URL) {
                     URL url = buildClassLoaderUrl(repository.getLocation());
-                    if (log.isDebugEnabled())
+                    if (log.isDebugEnabled()) {
                         log.debug("  Including URL " + url);
+                    }
                     set.add(url);
                 } else if (repository.getType() == RepositoryType.DIR) {
                     File directory = new File(repository.getLocation());
@@ -176,8 +178,9 @@ public final class ClassLoaderFactory {
                         continue;
                     }
                     URL url = buildClassLoaderUrl(directory);
-                    if (log.isDebugEnabled())
+                    if (log.isDebugEnabled()) {
                         log.debug("  Including directory " + url);
+                    }
                     set.add(url);
                 } else if (repository.getType() == RepositoryType.JAR) {
                     File file=new File(repository.getLocation());
@@ -186,8 +189,9 @@ public final class ClassLoaderFactory {
                         continue;
                     }
                     URL url = buildClassLoaderUrl(file);
-                    if (log.isDebugEnabled())
+                    if (log.isDebugEnabled()) {
                         log.debug("  Including jar file " + url);
+                    }
                     set.add(url);
                 } else if (repository.getType() == RepositoryType.GLOB) {
                     File directory=new File(repository.getLocation());
@@ -195,25 +199,28 @@ public final class ClassLoaderFactory {
                     if (!validateFile(directory, RepositoryType.GLOB)) {
                         continue;
                     }
-                    if (log.isDebugEnabled())
+                    if (log.isDebugEnabled()) {
                         log.debug("  Including directory glob "
                             + directory.getAbsolutePath());
+                    }
                     String filenames[] = directory.list();
                     if (filenames == null) {
                         continue;
                     }
                     for (String s : filenames) {
                         String filename = s.toLowerCase(Locale.ENGLISH);
-                        if (!filename.endsWith(".jar"))
+                        if (!filename.endsWith(".jar")) {
                             continue;
+                        }
                         File file = new File(directory, s);
                         file = file.getCanonicalFile();
                         if (!validateFile(file, RepositoryType.JAR)) {
                             continue;
                         }
-                        if (log.isDebugEnabled())
+                        if (log.isDebugEnabled()) {
                             log.debug("    Including glob jar file "
                                     + file.getAbsolutePath());
+                        }
                         URL url = buildClassLoaderUrl(file);
                         set.add(url);
                     }
@@ -222,20 +229,24 @@ public final class ClassLoaderFactory {
         }
 
         // Construct the class loader itself
+        // 将对应的路径组装成 URL
         final URL[] array = set.toArray(new URL[0]);
-        if (log.isDebugEnabled())
+        if (log.isDebugEnabled()) {
             for (int i = 0; i < array.length; i++) {
                 log.debug("  location " + i + " is " + array[i]);
             }
+        }
 
+        // 在创建 URLClassLoader 需要考虑到 AccessController 的影响
         return AccessController.doPrivileged(
                 new PrivilegedAction<URLClassLoader>() {
                     @Override
                     public URLClassLoader run() {
-                        if (parent == null)
+                        if (parent == null) {
                             return new URLClassLoader(array);
-                        else
+                        } else {
                             return new URLClassLoader(array, parent);
+                        }
                     }
                 });
     }

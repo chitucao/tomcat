@@ -19,16 +19,6 @@
 package org.apache.catalina.core;
 
 
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import javax.servlet.DispatcherType;
-import javax.servlet.RequestDispatcher;
-import javax.servlet.Servlet;
-import javax.servlet.ServletException;
-import javax.servlet.UnavailableException;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.catalina.Container;
 import org.apache.catalina.Context;
 import org.apache.catalina.Globals;
@@ -42,6 +32,11 @@ import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.buf.MessageBytes;
 import org.apache.tomcat.util.log.SystemLogHandler;
 import org.apache.tomcat.util.res.StringManager;
+
+import javax.servlet.*;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Valve that implements the default basic behavior for the
@@ -95,6 +90,7 @@ final class StandardWrapperValve
         throws IOException, ServletException {
 
         // Initialize local variables we may need
+        // 初始化我们可能需要的局部变量
         boolean unavailable = false;
         Throwable throwable = null;
         // This should be a Request attribute...
@@ -105,26 +101,24 @@ final class StandardWrapperValve
         Context context = (Context) wrapper.getParent();
 
         // Check for the application being marked unavailable
+        // 检查被标记为不可用的应用程序
         if (!context.getState().isAvailable()) {
-            response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE,
-                           sm.getString("standardContext.isUnavailable"));
+            response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, sm.getString("standardContext.isUnavailable"));
             unavailable = true;
         }
 
         // Check for the servlet being marked unavailable
+        // 检查标记为不可用的servlet
         if (!unavailable && wrapper.isUnavailable()) {
-            container.getLogger().info(sm.getString("standardWrapper.isUnavailable",
-                    wrapper.getName()));
+            container.getLogger().info(sm.getString("standardWrapper.isUnavailable", wrapper.getName()));
             long available = wrapper.getAvailable();
             if ((available > 0L) && (available < Long.MAX_VALUE)) {
                 response.setDateHeader("Retry-After", available);
-                response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE,
-                        sm.getString("standardWrapper.isUnavailable",
-                                wrapper.getName()));
+                // 503
+                response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, sm.getString("standardWrapper.isUnavailable", wrapper.getName()));
             } else if (available == Long.MAX_VALUE) {
-                response.sendError(HttpServletResponse.SC_NOT_FOUND,
-                        sm.getString("standardWrapper.notFound",
-                                wrapper.getName()));
+                // 404
+                response.sendError(HttpServletResponse.SC_NOT_FOUND, sm.getString("standardWrapper.notFound", wrapper.getName()));
             }
             unavailable = true;
         }
@@ -132,6 +126,7 @@ final class StandardWrapperValve
         // Allocate a servlet instance to process this request
         try {
             if (!unavailable) {
+                //分配一个servlet实例来处理这个请求
                 servlet = wrapper.allocate();
             }
         } catch (UnavailableException e) {
@@ -163,30 +158,34 @@ final class StandardWrapperValve
             servlet = null;
         }
 
+        //获取请求路径。
         MessageBytes requestPathMB = request.getRequestPathMB();
         DispatcherType dispatcherType = DispatcherType.REQUEST;
-        if (request.getDispatcherType()==DispatcherType.ASYNC) dispatcherType = DispatcherType.ASYNC;
+        if (request.getDispatcherType()==DispatcherType.ASYNC) {
+            dispatcherType = DispatcherType.ASYNC;
+        }
         request.setAttribute(Globals.DISPATCHER_TYPE_ATTR,dispatcherType);
         request.setAttribute(Globals.DISPATCHER_REQUEST_PATH_ATTR,
                 requestPathMB);
         // Create the filter chain for this request
-        ApplicationFilterChain filterChain =
-                ApplicationFilterFactory.createFilterChain(request, wrapper, servlet);
+        //为这个请求创建过滤器链
+        ApplicationFilterChain filterChain = ApplicationFilterFactory.createFilterChain(request, wrapper, servlet);
 
         // Call the filter chain for this request
+        // 为此请求调用过滤器链
         // NOTE: This also calls the servlet's service() method
+        // 这也调用servlet的service()方法
         Container container = this.container;
         try {
             if ((servlet != null) && (filterChain != null)) {
-                // Swallow output if needed
+                //   output if needed  如果需要，吞咽输出
                 if (context.getSwallowOutput()) {
                     try {
                         SystemLogHandler.startCapture();
                         if (request.isAsyncDispatching()) {
                             request.getAsyncContextInternal().doInternalDispatch();
                         } else {
-                            filterChain.doFilter(request.getRequest(),
-                                    response.getResponse());
+                            filterChain.doFilter(request.getRequest(), response.getResponse());
                         }
                     } finally {
                         String log = SystemLogHandler.stopCapture();
@@ -257,11 +256,13 @@ final class StandardWrapperValve
             exception(request, response, e);
         } finally {
             // Release the filter chain (if any) for this request
+            // 释放此请求的过滤器链(如果有的话)
             if (filterChain != null) {
                 filterChain.release();
             }
 
             // Deallocate the allocated servlet instance
+            // 释放分配的servlet实例
             try {
                 if (servlet != null) {
                     wrapper.deallocate(servlet);

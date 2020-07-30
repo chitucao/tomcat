@@ -16,19 +16,6 @@
  */
 package org.apache.catalina.connector;
 
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.EnumSet;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import javax.servlet.ReadListener;
-import javax.servlet.RequestDispatcher;
-import javax.servlet.ServletException;
-import javax.servlet.SessionTrackingMode;
-import javax.servlet.WriteListener;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.catalina.Authenticator;
 import org.apache.catalina.Context;
 import org.apache.catalina.Host;
@@ -52,6 +39,14 @@ import org.apache.tomcat.util.http.ServerCookies;
 import org.apache.tomcat.util.net.SSLSupport;
 import org.apache.tomcat.util.net.SocketEvent;
 import org.apache.tomcat.util.res.StringManager;
+
+import javax.servlet.*;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.EnumSet;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 /**
@@ -300,16 +295,21 @@ public class CoyoteAdapter implements Adapter {
     public void service(org.apache.coyote.Request req, org.apache.coyote.Response res)
             throws Exception {
 
+        //org.apache.catalina.connector.Request，实现了javax.servlet.http.HttpServletRequest接口
         Request request = (Request) req.getNote(ADAPTER_NOTES);
+        //org.apache.catalina.connector.Response，实现了javax.servlet.http.HttpServletResponse接口
         Response response = (Response) res.getNote(ADAPTER_NOTES);
 
+        //准备阶段
         if (request == null) {
+            // 创建请求与响应
             // Create objects
             request = connector.createRequest();
             request.setCoyoteRequest(req);
             response = connector.createResponse();
             response.setCoyoteResponse(res);
 
+            // 关联关系确定
             // Link objects
             request.setResponse(response);
             response.setRequest(request);
@@ -319,6 +319,7 @@ public class CoyoteAdapter implements Adapter {
             res.setNote(ADAPTER_NOTES, response);
 
             // Set query string encoding
+            // 编码方式
             req.getParameters().setQueryStringCharset(connector.getURICharset());
         }
 
@@ -334,15 +335,17 @@ public class CoyoteAdapter implements Adapter {
         try {
             // Parse and set Catalina and configuration specific
             // request parameters
+            // 解析并设置Catalina和配置特定的请求参数
             postParseSuccess = postParseRequest(req, request, res, response);
             if (postParseSuccess) {
                 //check valves if we support async
-                request.setAsyncSupported(
-                        connector.getService().getContainer().getPipeline().isAsyncSupported());
+                //如果我们支持异步止回阀
+                request.setAsyncSupported(connector.getService().getContainer().getPipeline().isAsyncSupported());
                 // Calling the container
-                connector.getService().getContainer().getPipeline().getFirst().invoke(
-                        request, response);
+                //调用容器
+                connector.getService().getContainer().getPipeline().getFirst().invoke(request, response);
             }
+            //如果是异步请求
             if (request.isAsync()) {
                 async = true;
                 ReadListener readListener = req.getReadListener();
@@ -360,8 +363,7 @@ public class CoyoteAdapter implements Adapter {
                     }
                 }
 
-                Throwable throwable =
-                        (Throwable) request.getAttribute(RequestDispatcher.ERROR_EXCEPTION);
+                Throwable throwable = (Throwable) request.getAttribute(RequestDispatcher.ERROR_EXCEPTION);
 
                 // If an async request was started, is not going to end once
                 // this container thread finishes and an error occurred, trigger
@@ -370,6 +372,7 @@ public class CoyoteAdapter implements Adapter {
                     request.getAsyncContextInternal().setErrorState(throwable, true);
                 }
             } else {
+                //结束请求和响应
                 request.finishRequest();
                 response.finishResponse();
             }
@@ -420,6 +423,7 @@ public class CoyoteAdapter implements Adapter {
             // Recycle the wrapper request and response
             if (!async) {
                 updateWrapperErrorCount(request, response);
+                //重新利用
                 request.recycle();
                 response.recycle();
             }

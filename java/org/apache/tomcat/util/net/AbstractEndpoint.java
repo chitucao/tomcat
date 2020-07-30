@@ -16,30 +16,6 @@
  */
 package org.apache.tomcat.util.net;
 
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
-import javax.management.MalformedObjectNameException;
-import javax.management.ObjectName;
-
 import org.apache.juli.logging.Log;
 import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.IntrospectionUtils;
@@ -47,11 +23,21 @@ import org.apache.tomcat.util.collections.SynchronizedStack;
 import org.apache.tomcat.util.modeler.Registry;
 import org.apache.tomcat.util.net.Acceptor.AcceptorState;
 import org.apache.tomcat.util.res.StringManager;
-import org.apache.tomcat.util.threads.LimitLatch;
-import org.apache.tomcat.util.threads.ResizableExecutor;
 import org.apache.tomcat.util.threads.TaskQueue;
-import org.apache.tomcat.util.threads.TaskThreadFactory;
 import org.apache.tomcat.util.threads.ThreadPoolExecutor;
+import org.apache.tomcat.util.threads.*;
+
+import javax.management.MalformedObjectNameException;
+import javax.management.ObjectName;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.*;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.*;
 
 /**
  * @param <S> The type used by the socket wrapper associated with this endpoint.
@@ -1089,18 +1075,24 @@ public abstract class AbstractEndpoint<S,U> {
                 return false;
             }
             SocketProcessorBase<S> sc = null;
+            //尝试使用缓存中的SocketProcessor
             if (processorCache != null) {
                 sc = processorCache.pop();
             }
             if (sc == null) {
+                //创建一个新的SocketProcessor
                 sc = createSocketProcessor(socketWrapper, event);
             } else {
+                //重置
                 sc.reset(socketWrapper, event);
             }
+            //获取工作线程池
             Executor executor = getExecutor();
             if (dispatch && executor != null) {
+                //在线程池中执行SocketProcessor任务
                 executor.execute(sc);
             } else {
+                //在当前线程执行SocketProcessor的run方法
                 sc.run();
             }
         } catch (RejectedExecutionException ree) {
@@ -1223,10 +1215,13 @@ public abstract class AbstractEndpoint<S,U> {
 
 
     public final void start() throws Exception {
+        //bind状态为未绑定的时候，执行bind
         if (bindState == BindState.UNBOUND) {
+            //子类实现
             bindWithCleanup();
             bindState = BindState.BOUND_ON_START;
         }
+        //这由子类实现
         startInternal();
     }
 

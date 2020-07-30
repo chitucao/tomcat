@@ -16,96 +16,11 @@
  */
 package org.apache.catalina.core;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.EventListener;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.Stack;
-import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import javax.management.ListenerNotFoundException;
-import javax.management.MBeanNotificationInfo;
-import javax.management.Notification;
-import javax.management.NotificationBroadcasterSupport;
-import javax.management.NotificationEmitter;
-import javax.management.NotificationFilter;
-import javax.management.NotificationListener;
-import javax.naming.NamingException;
-import javax.servlet.Filter;
-import javax.servlet.FilterConfig;
-import javax.servlet.FilterRegistration;
-import javax.servlet.RequestDispatcher;
-import javax.servlet.Servlet;
-import javax.servlet.ServletContainerInitializer;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletContextAttributeListener;
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRegistration;
-import javax.servlet.ServletRegistration.Dynamic;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletRequestAttributeListener;
-import javax.servlet.ServletRequestEvent;
-import javax.servlet.ServletRequestListener;
-import javax.servlet.ServletSecurityElement;
-import javax.servlet.SessionCookieConfig;
-import javax.servlet.SessionTrackingMode;
-import javax.servlet.descriptor.JspConfigDescriptor;
-import javax.servlet.http.HttpSessionAttributeListener;
-import javax.servlet.http.HttpSessionIdListener;
-import javax.servlet.http.HttpSessionListener;
-
-import org.apache.catalina.Authenticator;
-import org.apache.catalina.Container;
-import org.apache.catalina.ContainerListener;
-import org.apache.catalina.Context;
-import org.apache.catalina.CredentialHandler;
-import org.apache.catalina.Globals;
-import org.apache.catalina.Lifecycle;
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.LifecycleListener;
-import org.apache.catalina.LifecycleState;
-import org.apache.catalina.Loader;
-import org.apache.catalina.Manager;
-import org.apache.catalina.Pipeline;
-import org.apache.catalina.Realm;
-import org.apache.catalina.ThreadBindingListener;
-import org.apache.catalina.Valve;
-import org.apache.catalina.WebResource;
-import org.apache.catalina.WebResourceRoot;
-import org.apache.catalina.Wrapper;
+import org.apache.catalina.*;
 import org.apache.catalina.deploy.NamingResourcesImpl;
 import org.apache.catalina.loader.WebappLoader;
 import org.apache.catalina.session.StandardManager;
-import org.apache.catalina.util.CharsetMapper;
-import org.apache.catalina.util.ContextName;
-import org.apache.catalina.util.ErrorPageSupport;
-import org.apache.catalina.util.ExtensionValidator;
-import org.apache.catalina.util.URLEncoder;
+import org.apache.catalina.util.*;
 import org.apache.catalina.webresources.StandardRoot;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
@@ -118,22 +33,37 @@ import org.apache.tomcat.util.IntrospectionUtils;
 import org.apache.tomcat.util.buf.StringUtils;
 import org.apache.tomcat.util.compat.JreCompat;
 import org.apache.tomcat.util.descriptor.XmlIdentifiers;
-import org.apache.tomcat.util.descriptor.web.ApplicationParameter;
-import org.apache.tomcat.util.descriptor.web.ErrorPage;
-import org.apache.tomcat.util.descriptor.web.FilterDef;
-import org.apache.tomcat.util.descriptor.web.FilterMap;
-import org.apache.tomcat.util.descriptor.web.Injectable;
-import org.apache.tomcat.util.descriptor.web.InjectionTarget;
-import org.apache.tomcat.util.descriptor.web.LoginConfig;
-import org.apache.tomcat.util.descriptor.web.MessageDestination;
-import org.apache.tomcat.util.descriptor.web.MessageDestinationRef;
-import org.apache.tomcat.util.descriptor.web.SecurityCollection;
-import org.apache.tomcat.util.descriptor.web.SecurityConstraint;
+import org.apache.tomcat.util.descriptor.web.*;
 import org.apache.tomcat.util.http.CookieProcessor;
 import org.apache.tomcat.util.http.Rfc6265CookieProcessor;
 import org.apache.tomcat.util.scan.StandardJarScanner;
 import org.apache.tomcat.util.security.PrivilegedGetTccl;
 import org.apache.tomcat.util.security.PrivilegedSetTccl;
+
+import javax.management.*;
+import javax.naming.NamingException;
+import javax.servlet.*;
+import javax.servlet.ServletRegistration.Dynamic;
+import javax.servlet.descriptor.JspConfigDescriptor;
+import javax.servlet.http.HttpSessionAttributeListener;
+import javax.servlet.http.HttpSessionIdListener;
+import javax.servlet.http.HttpSessionListener;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Standard implementation of the <b>Context</b> interface.  Each
@@ -4841,6 +4771,7 @@ public class StandardContext extends ContainerBase
     public boolean loadOnStartup(Container children[]) {
 
         // Collect "load on startup" servlets that need to be initialized
+        // 收集需要初始化的“启动时加载”servlet
         TreeMap<Integer, ArrayList<Wrapper>> map = new TreeMap<>();
         for (Container child : children) {
             Wrapper wrapper = (Wrapper) child;
@@ -4858,6 +4789,7 @@ public class StandardContext extends ContainerBase
         }
 
         // Load the collected "load on startup" servlets
+        // 加载收集到的“启动时加载”servlet
         for (ArrayList<Wrapper> list : map.values()) {
             for (Wrapper wrapper : list) {
                 try {
@@ -4890,8 +4822,9 @@ public class StandardContext extends ContainerBase
     @Override
     protected synchronized void startInternal() throws LifecycleException {
 
-        if(log.isDebugEnabled())
+        if(log.isDebugEnabled()) {
             log.debug("Starting " + getBaseName());
+        }
 
         // Send j2ee.state.starting notification
         if (this.getObjectName() != null) {
@@ -4928,10 +4861,11 @@ public class StandardContext extends ContainerBase
             resourcesStart();
         }
 
+        // 实例化 Loader 实例，它是 tomcat 对于 ClassLoader 的封装，用于支持在运行期间热加载 class
         if (getLoader() == null) {
             WebappLoader webappLoader = new WebappLoader();
             webappLoader.setDelegate(getDelegate());
-            setLoader(webappLoader);
+            setLoader(webappLoader);  // 使用了读写锁控制并发问题
         }
 
         // An explicit cookie processor hasn't been specified; use the default
@@ -4980,18 +4914,20 @@ public class StandardContext extends ContainerBase
 
 
         // Binding thread
+        // 将 Loader 中的 ParallelWebappClassLoader 绑定到当前线程中，并返回 catalian 类加载器
         ClassLoader oldCCL = bindThread();
 
         try {
             if (ok) {
                 // Start our subordinate components, if any
+                // 如果 Loader 是 Lifecycle 实现类，则启动该 Loader
                 Loader loader = getLoader();
                 if (loader instanceof Lifecycle) {
                     ((Lifecycle) loader).start();
                 }
 
-                // since the loader just started, the webapp classloader is now
-                // created.
+                // since the loader just started, the webapp classloader is now created.
+                // 设置 ClassLoader 的各种属性
                 setClassLoaderProperty("clearReferencesRmiTargets",
                         getClearReferencesRmiTargets());
                 setClassLoaderProperty("clearReferencesStopThreads",
@@ -5009,6 +4945,7 @@ public class StandardContext extends ContainerBase
 
                 // By calling unbindThread and bindThread in a row, we setup the
                 // current Thread CCL to be the webapp classloader
+                // 解除线程上下文类加载器绑定
                 unbindThread(oldCCL);
                 oldCCL = bindThread();
 
@@ -5041,9 +4978,11 @@ public class StandardContext extends ContainerBase
                 }
 
                 // Notify our interested LifecycleListeners
+                // 发出 CONFIGURE_START_EVENT 事件，ContextConfig 会处理该事件，主要目的是加载 Context 的子容器
                 fireLifecycleEvent(Lifecycle.CONFIGURE_START_EVENT, null);
 
                 // Start our child containers, if not already started
+                // 启动子容器
                 for (Container child : findChildren()) {
                     if (!child.getState().isAvailable()) {
                         child.start();
@@ -5346,8 +5285,7 @@ public class StandardContext extends ContainerBase
         // Send j2ee.state.stopping notification
         if (this.getObjectName() != null) {
             Notification notification =
-                new Notification("j2ee.state.stopping", this.getObjectName(),
-                                 sequenceNumber.getAndIncrement());
+                new Notification("j2ee.state.stopping", this.getObjectName(), sequenceNumber.getAndIncrement());
             broadcaster.sendNotification(notification);
         }
 

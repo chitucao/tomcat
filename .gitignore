@@ -44,4 +44,4 @@ bin/setenv.*
 java/org/apache/catalina/startup/catalina.properties
 modules/jdbc-pool/bin
 modules/jdbc-pool/includes
-webapps/docs/jdbc-pool.xml
+home/webapps/docs/jdbc-pool.xml

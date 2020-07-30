@@ -16,37 +16,7 @@
  */
 package org.apache.catalina.core;
 
-import java.beans.PropertyChangeListener;
-import java.beans.PropertyChangeSupport;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.InetAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.security.AccessControlException;
-import java.util.Random;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
-import javax.management.InstanceNotFoundException;
-import javax.management.MBeanException;
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
-
-import org.apache.catalina.Context;
-import org.apache.catalina.Lifecycle;
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.LifecycleState;
-import org.apache.catalina.Server;
-import org.apache.catalina.Service;
+import org.apache.catalina.*;
 import org.apache.catalina.deploy.NamingResourcesImpl;
 import org.apache.catalina.mbeans.MBeanFactory;
 import org.apache.catalina.startup.Catalina;
@@ -60,6 +30,20 @@ import org.apache.tomcat.util.buf.StringCache;
 import org.apache.tomcat.util.modeler.Registry;
 import org.apache.tomcat.util.res.StringManager;
 import org.apache.tomcat.util.threads.TaskThreadFactory;
+
+import javax.management.InstanceNotFoundException;
+import javax.management.MBeanException;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeSupport;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.*;
+import java.security.AccessControlException;
+import java.util.Random;
+import java.util.concurrent.*;
 
 
 /**
@@ -505,17 +489,21 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
      */
     @Override
     public void addService(Service service) {
-
+        //service持有Server的引用
         service.setServer(this);
 
+        //服务锁，即service要一个一个的加入
         synchronized (servicesLock) {
+            //services数组拷贝，将新来的service增加到最后
             Service results[] = new Service[services.length + 1];
             System.arraycopy(services, 0, results, 0, services.length);
             results[services.length] = service;
             services = results;
 
+            //当前Server组件是available
             if (getState().isAvailable()) {
                 try {
+                    //调用service的生命周期方法start
                     service.start();
                 } catch (LifecycleException e) {
                     // Ignore
@@ -523,6 +511,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
             }
 
             // Report this property change to interested listeners
+            //将此属性更改报告给感兴趣的侦听器
             support.firePropertyChange("service", null, service);
         }
 
@@ -552,14 +541,18 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
 
     /**
      * Wait until a proper shutdown command is received, then return.
+     *  等待收到正确的关机命令，然后返回。
      * This keeps the main thread alive - the thread pool listening for http
      * connections is daemon threads.
+     * 这使主线程保持活动状态——侦听http连接的线程池是守护进程线程。
      */
     @Override
     public void await() {
         // Negative values - don't wait on port - tomcat is embedded or we just don't like ports
+        // 负值——不要等待端口——tomcat是嵌入式的，或者我们只是不喜欢端口
         if (getPortWithOffset() == -2) {
             // undocumented yet - for embedding apps that are around, alive.
+            // 还没有正式文件-为嵌入式应用程序周围，活着。
             return;
         }
         if (getPortWithOffset() == -1) {
@@ -579,6 +572,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
         }
 
         // Set up a server socket to wait on
+        //设置服务器套接字以等待
         try {
             awaitSocket = new ServerSocket(getPortWithOffset(), 1,
                     InetAddress.getByName(address));
@@ -593,6 +587,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
             awaitThread = Thread.currentThread();
 
             // Loop waiting for a connection and a valid command
+            //循环等待连接和有效命令
             while (!stopAwait) {
                 ServerSocket serverSocket = awaitSocket;
                 if (serverSocket == null) {
@@ -661,6 +656,7 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
                 }
 
                 // Match against our command string
+                // "SHUTDOWN"
                 boolean match = command.toString().equals(shutdown);
                 if (match) {
                     log.info(sm.getString("standardServer.shutdownViaPort"));
@@ -919,9 +915,10 @@ public final class StandardServer extends LifecycleMBeanBase implements Server {
     @Override
     protected void startInternal() throws LifecycleException {
 
+        //触发CONFIGURE_START_EVENT
         fireLifecycleEvent(CONFIGURE_START_EVENT, null);
         setState(LifecycleState.STARTING);
-
+        //NamingResourcesImpl生命周期start
         globalNamingResources.start();
 
         // Start our defined Services

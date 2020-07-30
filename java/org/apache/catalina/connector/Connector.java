@@ -16,15 +16,6 @@
  */
 package org.apache.catalina.connector;
 
-import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.HashSet;
-
-import javax.management.ObjectName;
-
 import org.apache.catalina.Globals;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.LifecycleState;
@@ -46,6 +37,14 @@ import org.apache.tomcat.util.buf.UDecoder;
 import org.apache.tomcat.util.net.SSLHostConfig;
 import org.apache.tomcat.util.net.openssl.OpenSSLImplementation;
 import org.apache.tomcat.util.res.StringManager;
+
+import javax.management.ObjectName;
+import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashSet;
 
 
 /**
@@ -996,7 +995,7 @@ public class Connector extends LifecycleMBeanBase  {
 
     @Override
     protected void initInternal() throws LifecycleException {
-
+        //父类初始化
         super.initInternal();
 
         if (protocolHandler == null) {
@@ -1005,7 +1004,9 @@ public class Connector extends LifecycleMBeanBase  {
         }
 
         // Initialize adapter
+        //初始化Adapter
         adapter = new CoyoteAdapter(this);
+        //adapter设置到protocolHandler中
         protocolHandler.setAdapter(adapter);
         if (service != null) {
             protocolHandler.setUtilityExecutor(service.getServer().getUtilityExecutor());
@@ -1036,6 +1037,7 @@ public class Connector extends LifecycleMBeanBase  {
         }
 
         try {
+            //初始化protocolHandler
             protocolHandler.init();
         } catch (Exception e) {
             throw new LifecycleException(

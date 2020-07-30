@@ -16,6 +16,19 @@
  */
 package org.apache.catalina.loader;
 
+import org.apache.catalina.*;
+import org.apache.catalina.util.LifecycleMBeanBase;
+import org.apache.catalina.util.ToStringUtil;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+import org.apache.tomcat.util.ExceptionUtils;
+import org.apache.tomcat.util.buf.UDecoder;
+import org.apache.tomcat.util.compat.JreCompat;
+import org.apache.tomcat.util.modeler.Registry;
+import org.apache.tomcat.util.res.StringManager;
+
+import javax.management.ObjectName;
+import javax.servlet.ServletContext;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
@@ -26,24 +39,6 @@ import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
-
-import javax.management.ObjectName;
-import javax.servlet.ServletContext;
-
-import org.apache.catalina.Context;
-import org.apache.catalina.Globals;
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.LifecycleState;
-import org.apache.catalina.Loader;
-import org.apache.catalina.util.LifecycleMBeanBase;
-import org.apache.catalina.util.ToStringUtil;
-import org.apache.juli.logging.Log;
-import org.apache.juli.logging.LogFactory;
-import org.apache.tomcat.util.ExceptionUtils;
-import org.apache.tomcat.util.buf.UDecoder;
-import org.apache.tomcat.util.compat.JreCompat;
-import org.apache.tomcat.util.modeler.Registry;
-import org.apache.tomcat.util.res.StringManager;
 
 /**
  * Classloader implementation which is specialized for handling web
@@ -61,8 +56,7 @@ import org.apache.tomcat.util.res.StringManager;
  * @author Craig R. McClanahan
  * @author Remy Maucherat
  */
-public class WebappLoader extends LifecycleMBeanBase
-    implements Loader, PropertyChangeListener {
+public class WebappLoader extends LifecycleMBeanBase implements Loader, PropertyChangeListener {
 
     private static final Log log = LogFactory.getLog(WebappLoader.class);
 
@@ -98,6 +92,7 @@ public class WebappLoader extends LifecycleMBeanBase
 
     /**
      * The class loader being managed by this Loader component.
+     * 默认使用ParallelWebappClassLoader
      */
     private WebappClassLoaderBase classLoader = null;
 
@@ -125,12 +120,14 @@ public class WebappLoader extends LifecycleMBeanBase
 
     /**
      * The parent class loader of the class loader we will create.
+     * 父加载器，默认为 catalina 类加载器
      */
     private ClassLoader parentClassLoader = null;
 
 
     /**
      * The reloadable flag for this Loader.
+     * 是否支持热加载类
      */
     private boolean reloadable = false;
 
@@ -293,15 +290,14 @@ public class WebappLoader extends LifecycleMBeanBase
     public void backgroundProcess() {
         if (reloadable && modified()) {
             try {
-                Thread.currentThread().setContextClassLoader
-                    (WebappLoader.class.getClassLoader());
+                // 变更线程上下文类加载器为 webapp 类加载器
+                Thread.currentThread().setContextClassLoader(WebappLoader.class.getClassLoader());
                 if (context != null) {
-                    context.reload();
+                    context.reload();   // 重载 webapp
                 }
             } finally {
                 if (context != null && context.getLoader() != null) {
-                    Thread.currentThread().setContextClassLoader
-                        (context.getLoader().getClassLoader());
+                    Thread.currentThread().setContextClassLoader(context.getLoader().getClassLoader());
                 }
             }
         }

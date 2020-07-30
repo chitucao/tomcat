@@ -16,18 +16,14 @@
  */
 package org.apache.catalina.util;
 
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-import org.apache.catalina.Lifecycle;
-import org.apache.catalina.LifecycleEvent;
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.LifecycleListener;
-import org.apache.catalina.LifecycleState;
+import org.apache.catalina.*;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.res.StringManager;
+
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Base implementation of the {@link Lifecycle} interface that implements the
@@ -127,13 +123,17 @@ public abstract class LifecycleBase implements Lifecycle {
 
     @Override
     public final synchronized void init() throws LifecycleException {
+        //如果state不是LifecycleState.NEW，执行下面的逻辑
         if (!state.equals(LifecycleState.NEW)) {
             invalidTransition(Lifecycle.BEFORE_INIT_EVENT);
         }
 
         try {
+            //正在初始化节点
             setStateInternal(LifecycleState.INITIALIZING, null, false);
+            //具体实例实现
             initInternal();
+            //初始化结束
             setStateInternal(LifecycleState.INITIALIZED, null, false);
         } catch (Throwable t) {
             handleSubClassException(t, "lifecycleBase.initFail", toString());

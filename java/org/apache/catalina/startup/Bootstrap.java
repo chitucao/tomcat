@@ -16,6 +16,13 @@
  */
 package org.apache.catalina.startup;
 
+import org.apache.catalina.Globals;
+import org.apache.catalina.security.SecurityClassLoad;
+import org.apache.catalina.startup.ClassLoaderFactory.Repository;
+import org.apache.catalina.startup.ClassLoaderFactory.RepositoryType;
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -26,13 +33,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.apache.catalina.Globals;
-import org.apache.catalina.security.SecurityClassLoad;
-import org.apache.catalina.startup.ClassLoaderFactory.Repository;
-import org.apache.catalina.startup.ClassLoaderFactory.RepositoryType;
-import org.apache.juli.logging.Log;
-import org.apache.juli.logging.LogFactory;
 
 /**
  * Bootstrap loader for Catalina.  This application constructs a class loader
@@ -142,11 +142,13 @@ public final class Bootstrap {
 
     private void initClassLoaders() {
         try {
+            // 从catalina.properties中读取common.loader配置作为common类加载的路径
             commonLoader = createClassLoader("common", null);
             if (commonLoader == null) {
                 // no config file, default to this loader - we might be in a 'single' env.
                 commonLoader = this.getClass().getClassLoader();
             }
+            // 如果未指定server.loader和shared.loader配置，则catalina和shared类加载器都是common类加载器
             catalinaLoader = createClassLoader("server", commonLoader);
             sharedLoader = createClassLoader("shared", commonLoader);
         } catch (Throwable t) {
@@ -157,19 +159,22 @@ public final class Bootstrap {
     }
 
 
-    private ClassLoader createClassLoader(String name, ClassLoader parent)
-        throws Exception {
+    private ClassLoader createClassLoader(String name, ClassLoader parent) throws Exception {
 
+        // 从catalina.propeties中读取配置，并替换 catalina.home、或者catalina.base，或者环境变量
         String value = CatalinaProperties.getProperty(name + ".loader");
-        if ((value == null) || (value.equals("")))
+        if ((value == null) || (value.equals(""))) {
             return parent;
+        }
 
         value = replace(value);
 
+        // 遍历目录，并对路径进行处理
         List<Repository> repositories = new ArrayList<>();
 
         String[] repositoryPaths = getPaths(value);
 
+        // 将路径封装成 Repository 对象
         for (String repository : repositoryPaths) {
             // Check for a JAR URL repository
             try {
@@ -249,30 +254,36 @@ public final class Bootstrap {
      */
     public void init() throws Exception {
 
+        // 初始化commonLoader、catalinaLoader、sharedLoader，关于ClassLoader的后面再看
         initClassLoaders();
 
+        // 设置上下文类加载器为 catalinaLoader
         Thread.currentThread().setContextClassLoader(catalinaLoader);
 
         SecurityClassLoad.securityClassLoad(catalinaLoader);
 
         // Load our startup class and call its process() method
-        if (log.isDebugEnabled())
+        if (log.isDebugEnabled()) {
             log.debug("Loading startup class");
+        }
+        // 反射方法实例化Catalina，后面初始化Catalina用了很多反射，不知道意图是什么
         Class<?> startupClass = catalinaLoader.loadClass("org.apache.catalina.startup.Catalina");
         Object startupInstance = startupClass.getConstructor().newInstance();
 
         // Set the shared extensions class loader
-        if (log.isDebugEnabled())
+        // 为Catalina对象设置其父加载器为shared类加载器，默认情况下就是catalina类加载器
+        if (log.isDebugEnabled()) {
             log.debug("Setting startup class properties");
+        }
         String methodName = "setParentClassLoader";
         Class<?> paramTypes[] = new Class[1];
         paramTypes[0] = Class.forName("java.lang.ClassLoader");
         Object paramValues[] = new Object[1];
         paramValues[0] = sharedLoader;
-        Method method =
-            startupInstance.getClass().getMethod(methodName, paramTypes);
+        Method method = startupInstance.getClass().getMethod(methodName, paramTypes);
         method.invoke(startupInstance, paramValues);
 
+        // 引用Catalina实例
         catalinaDaemon = startupInstance;
     }
 
@@ -395,15 +406,13 @@ public final class Bootstrap {
      * @param await <code>true</code> if the daemon should block
      * @throws Exception Reflection error
      */
-    public void setAwait(boolean await)
-        throws Exception {
+    public void setAwait(boolean await) throws Exception {
 
         Class<?> paramTypes[] = new Class[1];
         paramTypes[0] = Boolean.TYPE;
         Object paramValues[] = new Object[1];
         paramValues[0] = Boolean.valueOf(await);
-        Method method =
-            catalinaDaemon.getClass().getMethod("setAwait", paramTypes);
+        Method method = catalinaDaemon.getClass().getMethod("setAwait", paramTypes);
         method.invoke(catalinaDaemon, paramValues);
     }
 
@@ -430,16 +439,21 @@ public final class Bootstrap {
     /**
      * Main method and entry point when starting Tomcat via the provided
      * scripts.
+     * 通过提供的脚本启动Tomcat时的主方法和入口点。
      *
      * @param args Command line arguments to be processed
      */
     public static void main(String args[]) {
 
+        // main使用的守护进程对象。
         synchronized (daemonLock) {
+            // daemon是volatile修饰的Bootstrap对象
             if (daemon == null) {
                 // Don't set daemon until init() has completed
+                // 在init()完成之前不要设置守护进程
                 Bootstrap bootstrap = new Bootstrap();
                 try {
+                    // 初始化守护进程。
                     bootstrap.init();
                 } catch (Throwable t) {
                     handleThrowable(t);
@@ -451,6 +465,8 @@ public final class Bootstrap {
                 // When running as a service the call to stop will be on a new
                 // thread so make sure the correct class loader is used to
                 // prevent a range of class not found exceptions.
+                // 当作为服务运行时，要停止的调用将位于新线程上，
+                // 因此请确保使用了正确的类加载器，以防止出现一系列类未找到异常。直到init()完成
                 Thread.currentThread().setContextClassLoader(daemon.catalinaLoader);
             }
         }
@@ -461,6 +477,7 @@ public final class Bootstrap {
                 command = args[args.length - 1];
             }
 
+            //命令解析与执行
             if (command.equals("startd")) {
                 args[args.length - 1] = "start";
                 daemon.load(args);
@@ -469,13 +486,19 @@ public final class Bootstrap {
                 args[args.length - 1] = "stop";
                 daemon.stop();
             } else if (command.equals("start")) {
+                // 启动操作
+                // 通过反射调用守护进程引用的org.apache.catalina.startup.Catalina实例的setAwait方法
                 daemon.setAwait(true);
+                // 调用Catalina实例的load方法
                 daemon.load(args);
+                // start方法
                 daemon.start();
+                // 反射调用Catalina实例的getServer方法，返回的对象为空时，终止当前运行的Java虚拟机。
                 if (null == daemon.getServer()) {
                     System.exit(1);
                 }
             } else if (command.equals("stop")) {
+                // 通过反射调用Catalina的stopServer方法。
                 daemon.stopServer(args);
             } else if (command.equals("configtest")) {
                 daemon.load(args);

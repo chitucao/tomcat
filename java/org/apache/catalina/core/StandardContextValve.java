@@ -16,18 +16,17 @@
  */
 package org.apache.catalina.core;
 
-import java.io.IOException;
-
-import javax.servlet.RequestDispatcher;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.catalina.Wrapper;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
 import org.apache.tomcat.util.buf.MessageBytes;
 import org.apache.tomcat.util.res.StringManager;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 /**
  * Valve that implements the default basic behavior for the
@@ -63,6 +62,7 @@ final class StandardContextValve extends ValveBase {
         throws IOException, ServletException {
 
         // Disallow any direct access to resources under WEB-INF or META-INF
+        //禁止直接访问WEB-INF或META-INF下的资源
         MessageBytes requestPathMB = request.getRequestPathMB();
         if ((requestPathMB.startsWithIgnoreCase("/META-INF/", 0))
                 || (requestPathMB.equalsIgnoreCase("/META-INF"))
@@ -73,6 +73,7 @@ final class StandardContextValve extends ValveBase {
         }
 
         // Select the Wrapper to be used for this Request
+        //选择要用于此请求的包装器
         Wrapper wrapper = request.getWrapper();
         if (wrapper == null || wrapper.isUnavailable()) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -81,6 +82,7 @@ final class StandardContextValve extends ValveBase {
 
         // Acknowledge the request
         try {
+            //确认请求
             response.sendAcknowledgement();
         } catch (IOException ioe) {
             container.getLogger().error(sm.getString(
@@ -93,6 +95,7 @@ final class StandardContextValve extends ValveBase {
         if (request.isAsyncSupported()) {
             request.setAsyncSupported(wrapper.getPipeline().isAsyncSupported());
         }
+        //调用StandardWrapperValve
         wrapper.getPipeline().getFirst().invoke(request, response);
     }
 }

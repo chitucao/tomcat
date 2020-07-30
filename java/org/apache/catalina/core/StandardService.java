@@ -17,20 +17,7 @@
 package org.apache.catalina.core;
 
 
-import java.beans.PropertyChangeListener;
-import java.beans.PropertyChangeSupport;
-import java.util.ArrayList;
-
-import javax.management.ObjectName;
-
-import org.apache.catalina.Container;
-import org.apache.catalina.Engine;
-import org.apache.catalina.Executor;
-import org.apache.catalina.JmxEnabled;
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.LifecycleState;
-import org.apache.catalina.Server;
-import org.apache.catalina.Service;
+import org.apache.catalina.*;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.mapper.Mapper;
 import org.apache.catalina.mapper.MapperListener;
@@ -38,6 +25,11 @@ import org.apache.catalina.util.LifecycleMBeanBase;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 import org.apache.tomcat.util.res.StringManager;
+
+import javax.management.ObjectName;
+import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeSupport;
+import java.util.ArrayList;
 
 
 /**
@@ -121,10 +113,12 @@ public class StandardService extends LifecycleMBeanBase implements Service {
 
     @Override
     public void setContainer(Engine engine) {
+        //废掉老的Engine
         Engine oldEngine = this.engine;
         if (oldEngine != null) {
             oldEngine.setService(null);
         }
+        //绑定新的engine
         this.engine = engine;
         if (this.engine != null) {
             this.engine.setService(this);
@@ -132,12 +126,14 @@ public class StandardService extends LifecycleMBeanBase implements Service {
         if (getState().isAvailable()) {
             if (this.engine != null) {
                 try {
+                    //生命周期函数
                     this.engine.start();
                 } catch (LifecycleException e) {
                     log.error(sm.getString("standardService.engine.startFailed"), e);
                 }
             }
             // Restart MapperListener to pick up new engine.
+            //重启MapperListener以获取新引擎。
             try {
                 mapperListener.stop();
             } catch (LifecycleException e) {
@@ -148,6 +144,7 @@ public class StandardService extends LifecycleMBeanBase implements Service {
             } catch (LifecycleException e) {
                 log.error(sm.getString("standardService.mapperListener.startFailed"), e);
             }
+            //关闭老的引擎
             if (oldEngine != null) {
                 try {
                     oldEngine.stop();
@@ -213,7 +210,7 @@ public class StandardService extends LifecycleMBeanBase implements Service {
      */
     @Override
     public void addConnector(Connector connector) {
-
+        //connector一个一个加入到当前Service组件中
         synchronized (connectorsLock) {
             connector.setService(this);
             Connector results[] = new Connector[connectors.length + 1];
@@ -224,6 +221,7 @@ public class StandardService extends LifecycleMBeanBase implements Service {
 
         try {
             if (getState().isAvailable()) {
+                //connector一个一个加入到当前Service组件中
                 connector.start();
             }
         } catch (LifecycleException e) {
